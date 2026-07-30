@@ -27,10 +27,10 @@ SECRET_KEY = 'django-insecure-k_5m%q!&rd1e37z&5e4x6=r+5q6goigzcv9gzydwnt_#^6rfh3
 DEBUG = True
 
 ALLOWED_HOSTS = [
+    'simple-login-backend-f88n.onrender.com',
     'localhost',
-    '127.0.0.1',
+    '127.0.0.1'
 ]
-
 
 
 # Application definition
