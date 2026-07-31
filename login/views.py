@@ -38,3 +38,40 @@ def register_view(request):
 
     return JsonResponse({'error': 'POST required'}, status=400)
 
+
+from rest_framework_simplejwt.tokens import RefreshToken
+
+@csrf_exempt
+def login_view(request):
+    if request.method == 'POST':
+        data = json.loads(request.body)
+        username = data.get('username')
+        password = data.get('password')
+
+        user = authenticate(username=username, password=password)
+        if user is None:
+            return JsonResponse({'error': 'Invalid credentials'}, status=401)
+
+        refresh = RefreshToken.for_user(user)
+
+        return JsonResponse({
+            'message': 'Login successful',
+            'access': str(refresh.access_token),
+            'refresh': str(refresh),
+            'user': username
+        })
+
+    return JsonResponse({'error': 'POST required'}, status=400)
+
+
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def dashboard_view(request):
+    return Response({"message": f"Welcome {request.user.username}!"})
+
+
+
