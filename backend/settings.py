@@ -33,6 +33,7 @@ ALLOWED_HOSTS = [
     'simple-login-backend-f88m.onrender.com',
     'localhost',
     '127.0.0.1'
+    'simple-login-frontend-yimr.onrender.com'
 ]
 
 
