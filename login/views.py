@@ -75,3 +75,16 @@ def dashboard_view(request):
 
 
 
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def profile_view(request):
+    user = request.user
+
+    return Response({
+        "username": user.username,
+        "email": user.email,
+        "date_joined": user.date_joined,
+        "last_login": user.last_login,
+    })
+
