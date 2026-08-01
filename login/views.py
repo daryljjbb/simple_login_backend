@@ -88,3 +88,90 @@ def profile_view(request):
         "last_login": user.last_login,
     })
 
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def update_profile_view(request):
+    user = request.user
+    data = request.data
+
+    new_email = data.get("email")
+    new_username = data.get("username")
+
+    if new_email:
+        user.email = new_email
+
+    if new_username:
+        user.username = new_username
+
+    user.save()
+
+    return Response({
+        "message": "Profile updated successfully",
+        "username": user.username,
+        "email": user.email,
+    })
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def change_password_view(request):
+    user = request.user
+    data = request.data
+
+    old_password = data.get("old_password")
+    new_password = data.get("new_password")
+
+    if not user.check_password(old_password):
+        return Response({"error": "Old password is incorrect"}, status=400)
+
+    user.set_password(new_password)
+    user.save()
+
+    return Response({"message": "Password updated successfully"})
+
+
+
+from .models import Note
+from .serializers import NoteSerializer
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+
+@api_view(["GET", "POST"])
+@permission_classes([IsAuthenticated])
+def notes_list_create_view(request):
+    if request.method == "GET":
+        notes = Note.objects.filter(user=request.user).order_by("-created_at")
+        serializer = NoteSerializer(notes, many=True)
+        return Response(serializer.data)
+
+    if request.method == "POST":
+        serializer = NoteSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save(user=request.user)
+            return Response(serializer.data, status=201)
+        return Response(serializer.errors, status=400)
+
+
+@api_view(["PUT", "DELETE"])
+@permission_classes([IsAuthenticated])
+def note_detail_view(request, pk):
+    try:
+        note = Note.objects.get(pk=pk, user=request.user)
+    except Note.DoesNotExist:
+        return Response({"error": "Not found"}, status=404)
+
+    if request.method == "PUT":
+        serializer = NoteSerializer(note, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=400)
+
+    if request.method == "DELETE":
+        note.delete()
+        return Response(status=204)
+
+
