@@ -19,18 +19,47 @@ class UserSerializer(serializers.ModelSerializer):
 
 # ---------------------------------------------------------
 # JWT TOKEN SERIALIZER (adds role + username to token)
+# Bulletproof: auto‑creates missing UserProfile
 # ---------------------------------------------------------
 
 class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
+
     @classmethod
     def get_token(cls, user):
         token = super().get_token(user)
 
+        # Ensure profile exists (fixes 500 login crash)
+        profile, created = UserProfile.objects.get_or_create(
+            user=user,
+            defaults={"role": "user"}
+        )
+
         # Custom claims
         token["username"] = user.username
-        token["role"] = getattr(user.profile, "role", "user")
+        token["role"] = profile.role
 
         return token
+
+    def validate(self, attrs):
+        """
+        Override validate() so the response includes:
+        - access token
+        - refresh token
+        - role
+        - username
+        """
+        data = super().validate(attrs)
+
+        # Ensure profile exists again (double safety)
+        profile, created = UserProfile.objects.get_or_create(
+            user=self.user,
+            defaults={"role": "user"}
+        )
+
+        data["username"] = self.user.username
+        data["role"] = profile.role
+
+        return data
 
 
 # ---------------------------------------------------------
