@@ -18,3 +18,11 @@ urlpatterns += [
     path("notes/", notes_list_create_view, name="notes_list_create"),
     path("notes/<int:pk>/", note_detail_view, name="note_detail"),
 ]
+
+
+from .views import tasks_list_create_view, task_detail_view
+
+urlpatterns += [
+    path("tasks/", tasks_list_create_view, name="tasks_list_create"),
+    path("tasks/<int:pk>/", task_detail_view, name="task_detail"),
+]

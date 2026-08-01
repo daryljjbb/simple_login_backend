@@ -175,3 +175,49 @@ def note_detail_view(request, pk):
         return Response(status=204)
 
 
+
+
+
+from .models import Task
+from .serializers import TaskSerializer
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+
+@api_view(["GET", "POST"])
+@permission_classes([IsAuthenticated])
+def tasks_list_create_view(request):
+    if request.method == "GET":
+        tasks = Task.objects.filter(user=request.user).order_by("completed", "due_date")
+        serializer = TaskSerializer(tasks, many=True)
+        return Response(serializer.data)
+
+    if request.method == "POST":
+        serializer = TaskSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save(user=request.user)
+            return Response(serializer.data, status=201)
+        return Response(serializer.errors, status=400)
+
+
+@api_view(["PUT", "DELETE"])
+@permission_classes([IsAuthenticated])
+def task_detail_view(request, pk):
+    try:
+        task = Task.objects.get(pk=pk, user=request.user)
+    except Task.DoesNotExist:
+        return Response({"error": "Not found"}, status=404)
+
+    if request.method == "PUT":
+        serializer = TaskSerializer(task, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=400)
+
+    if request.method == "DELETE":
+        task.delete()
+        return Response(status=204)
+
+
+
