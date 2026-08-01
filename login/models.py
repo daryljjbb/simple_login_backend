@@ -1,6 +1,33 @@
 from django.db import models
 from django.contrib.auth.models import User
 
+
+# ---------------------------------------------------------
+# USER PROFILE (roles)
+# ---------------------------------------------------------
+
+class UserProfile(models.Model):
+    ROLE_CHOICES = [
+        ("admin", "Admin"),
+        ("teacher", "Teacher"),
+        ("student", "Student"),
+        ("doctor", "Doctor"),
+        ("nurse", "Nurse"),
+        ("patient", "Patient"),
+        ("user", "User"),
+    ]
+
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="profile")
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default="user")
+
+    def __str__(self):
+        return f"{self.user.username} ({self.role})"
+
+
+# ---------------------------------------------------------
+# NOTES
+# ---------------------------------------------------------
+
 class Note(models.Model):
     CATEGORY_CHOICES = [
         ("work", "Work"),
@@ -20,6 +47,9 @@ class Note(models.Model):
         return self.title
 
 
+# ---------------------------------------------------------
+# TASKS
+# ---------------------------------------------------------
 
 class Task(models.Model):
     PRIORITY_CHOICES = [
@@ -37,4 +67,3 @@ class Task(models.Model):
 
     def __str__(self):
         return self.title
-

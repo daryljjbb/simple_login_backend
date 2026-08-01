@@ -47,8 +47,9 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
+     "rest_framework_simplejwt.token_blacklist",
     'corsheaders',
-    'login',
+    "login.apps.LoginConfig",
 ]
 
 MIDDLEWARE = [
@@ -136,10 +137,20 @@ STATIC_URL = 'static/'
 
 from datetime import timedelta
 
+# ---------------------------------------------------------
+# SIMPLE JWT (refresh rotation + blacklist)
+# ---------------------------------------------------------
+
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),
-    "REFRESH_TOKEN_LIFETIME": timedelta(days=1),
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=5),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
+
+    "ROTATE_REFRESH_TOKENS": True,
+    "BLACKLIST_AFTER_ROTATION": True,
+
+    "AUTH_HEADER_TYPES": ("Bearer",),
 }
+
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (

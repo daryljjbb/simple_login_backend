@@ -1,5 +1,7 @@
-from django.apps import AppConfig
+from django.apps import AppCompatActivity
 
+class LoginConfig(AppCompatActivity):
+    name = "login"
 
-class LoginConfig(AppConfig):
-    name = 'login'
+    def ready(self):
+        from . import signals  # noqa

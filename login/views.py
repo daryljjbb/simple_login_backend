@@ -1,143 +1,189 @@
-from django.contrib.auth import authenticate
-from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
-import json
-
-@csrf_exempt
-def login_view(request):
-    if request.method == 'POST':
-        data = json.loads(request.body)
-        username = data.get('username')
-        password = data.get('password')
-        user = authenticate(username=username, password=password)
-        if user is not None:
-            return JsonResponse({'message': 'Login successful', 'user': username})
-        else:
-            return JsonResponse({'error': 'Invalid credentials'}, status=401)
-    return JsonResponse({'error': 'POST required'}, status=400)
-
 from django.contrib.auth.models import User
-from django.views.decorators.csrf import csrf_exempt
+from django.contrib.auth import authenticate
+from rest_framework import status
+from rest_framework.response import Response
+from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticated, BasePermission
+from rest_framework.decorators import api_view, permission_classes
 
-
-@csrf_exempt
-def register_view(request):
-    if request.method == 'POST':
-        data = json.loads(request.body)
-        username = data.get('username')
-        password = data.get('password')
-
-        if not username or not password:
-            return JsonResponse({'error': 'Username and password required'}, status=400)
-
-        if User.objects.filter(username=username).exists():
-            return JsonResponse({'error': 'Username already exists'}, status=409)
-
-        user = User.objects.create_user(username=username, password=password)
-        return JsonResponse({'message': 'User created successfully', 'user': user.username})
-
-    return JsonResponse({'error': 'POST required'}, status=400)
-
-
+from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.tokens import RefreshToken
 
-@csrf_exempt
-def login_view(request):
-    if request.method == 'POST':
-        data = json.loads(request.body)
-        username = data.get('username')
-        password = data.get('password')
+from .models import UserProfile, Note, Task
+from .serializers import (
+    UserSerializer,
+    MyTokenObtainPairSerializer,
+    NoteSerializer,
+    TaskSerializer,
+)
 
-        user = authenticate(username=username, password=password)
-        if user is None:
-            return JsonResponse({'error': 'Invalid credentials'}, status=401)
+# ---------------------------------------------------------
+# JWT LOGIN (with role included)
+# ---------------------------------------------------------
 
-        refresh = RefreshToken.for_user(user)
+class MyTokenObtainPairView(TokenObtainPairView):
+    serializer_class = MyTokenObtainPairSerializer
 
-        return JsonResponse({
-            'message': 'Login successful',
-            'access': str(refresh.access_token),
-            'refresh': str(refresh),
-            'user': username
+
+# ---------------------------------------------------------
+# REGISTER
+# ---------------------------------------------------------
+
+class RegisterView(APIView):
+    def post(self, request):
+        username = request.data.get("username")
+        email = request.data.get("email")
+        password = request.data.get("password")
+
+        if not username or not password:
+            return Response({"error": "Username and password required."},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        if User.objects.filter(username=username).exists():
+            return Response({"error": "Username already taken."},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        user = User.objects.create_user(username=username, email=email, password=password)
+        UserProfile.objects.create(user=user, role="user")
+
+        return Response({"message": "User registered successfully."},
+                        status=status.HTTP_201_CREATED)
+
+
+# ---------------------------------------------------------
+# PROFILE
+# ---------------------------------------------------------
+
+class ProfileView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        serializer = UserSerializer(request.user)
+        return Response(serializer.data)
+
+    def put(self, request):
+        user = request.user
+        user.email = request.data.get("email", user.email)
+        user.save()
+        serializer = UserSerializer(user)
+        return Response(serializer.data)
+
+
+# ---------------------------------------------------------
+# CHANGE PASSWORD
+# ---------------------------------------------------------
+
+class ChangePasswordView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        old_password = request.data.get("old_password")
+        new_password = request.data.get("new_password")
+
+        if not request.user.check_password(old_password):
+            return Response({"error": "Current password is incorrect."},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        request.user.set_password(new_password)
+        request.user.save()
+        return Response({"message": "Password changed successfully."})
+
+
+# ---------------------------------------------------------
+# ROLE PERMISSIONS
+# ---------------------------------------------------------
+
+class IsAdmin(BasePermission):
+    def has_permission(self, request, view):
+        return hasattr(request.user, "profile") and request.user.profile.role == "admin"
+
+# ---------------------------------------------------------
+# ADMIN ROLE MANAGEMENT
+# ---------------------------------------------------------
+
+class AdminUserListView(APIView):
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    def get(self, request):
+        users = User.objects.all().order_by("username")
+        data = []
+
+        for user in users:
+            data.append({
+                "id": user.id,
+                "username": user.username,
+                "email": user.email,
+                "role": user.profile.role,
+                "date_joined": user.date_joined,
+            })
+
+        return Response(data)
+
+
+class AdminUserDetailView(APIView):
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    def get(self, request, pk):
+        try:
+            user = User.objects.get(pk=pk)
+        except User.DoesNotExist:
+            return Response({"error": "User not found"}, status=404)
+
+        return Response({
+            "id": user.id,
+            "username": user.username,
+            "email": user.email,
+            "role": user.profile.role,
+            "date_joined": user.date_joined,
         })
 
-    return JsonResponse({'error': 'POST required'}, status=400)
+
+class AdminUpdateRoleView(APIView):
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    def post(self, request, pk):
+        new_role = request.data.get("role")
+
+        if new_role not in dict(UserProfile.ROLE_CHOICES):
+            return Response({"error": "Invalid role"}, status=400)
+
+        try:
+            user = User.objects.get(pk=pk)
+        except User.DoesNotExist:
+            return Response({"error": "User not found"}, status=404)
+
+        user.profile.role = new_role
+        user.profile.save()
+
+        return Response({"message": f"Role updated to {new_role}"})
 
 
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.response import Response
+class AdminDeleteUserView(APIView):
+    permission_classes = [IsAuthenticated, IsAdmin]
 
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def dashboard_view(request):
-    return Response({"message": f"Welcome {request.user.username}!"})
+    def delete(self, request, pk):
+        try:
+            user = User.objects.get(pk=pk)
+        except User.DoesNotExist:
+            return Response({"error": "User not found"}, status=404)
 
+        user.delete()
+        return Response({"message": "User deleted successfully"})
 
+# ---------------------------------------------------------
+# ADMIN DASHBOARD EXAMPLE
+# ---------------------------------------------------------
 
+class AdminDashboardView(APIView):
+    permission_classes = [IsAuthenticated, IsAdmin]
 
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def profile_view(request):
-    user = request.user
-
-    return Response({
-        "username": user.username,
-        "email": user.email,
-        "date_joined": user.date_joined,
-        "last_login": user.last_login,
-    })
+    def get(self, request):
+        return Response({"message": "Admin dashboard data"})
 
 
-
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def update_profile_view(request):
-    user = request.user
-    data = request.data
-
-    new_email = data.get("email")
-    new_username = data.get("username")
-
-    if new_email:
-        user.email = new_email
-
-    if new_username:
-        user.username = new_username
-
-    user.save()
-
-    return Response({
-        "message": "Profile updated successfully",
-        "username": user.username,
-        "email": user.email,
-    })
-
-
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def change_password_view(request):
-    user = request.user
-    data = request.data
-
-    old_password = data.get("old_password")
-    new_password = data.get("new_password")
-
-    if not user.check_password(old_password):
-        return Response({"error": "Old password is incorrect"}, status=400)
-
-    user.set_password(new_password)
-    user.save()
-
-    return Response({"message": "Password updated successfully"})
-
-
-
-from .models import Note
-from .serializers import NoteSerializer
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.response import Response
+# ---------------------------------------------------------
+# NOTES
+# ---------------------------------------------------------
 
 @api_view(["GET", "POST"])
 @permission_classes([IsAuthenticated])
@@ -175,14 +221,9 @@ def note_detail_view(request, pk):
         return Response(status=204)
 
 
-
-
-
-from .models import Task
-from .serializers import TaskSerializer
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.response import Response
+# ---------------------------------------------------------
+# TASKS
+# ---------------------------------------------------------
 
 @api_view(["GET", "POST"])
 @permission_classes([IsAuthenticated])
@@ -218,6 +259,3 @@ def task_detail_view(request, pk):
     if request.method == "DELETE":
         task.delete()
         return Response(status=204)
-
-
-
