@@ -170,6 +170,39 @@ class AdminDeleteUserView(APIView):
         user.delete()
         return Response({"message": "User deleted successfully"})
 
+
+# ---------------------------------------------------------
+# ADMIN ROLE MANAGEMENT (PROMOTE / DEMOTE)
+# ---------------------------------------------------------
+
+class AdminUpdateRoleView(APIView):
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    def post(self, request, pk):
+        new_role = request.data.get("role")
+
+        # Validate role
+        if new_role not in dict(UserProfile.ROLE_CHOICES):
+            return Response({"error": "Invalid role"}, status=400)
+
+        try:
+            user = User.objects.get(pk=pk)
+        except User.DoesNotExist:
+            return Response({"error": "User not found"}, status=404)
+
+        # Update role
+        user.profile.role = new_role
+        user.profile.save()
+
+        return Response({
+            "message": f"Role updated to {new_role}",
+            "id": user.id,
+            "username": user.username,
+            "email": user.email,
+            "role": user.profile.role,
+        })
+
+
 # ---------------------------------------------------------
 # ADMIN DASHBOARD EXAMPLE
 # ---------------------------------------------------------
