@@ -6,6 +6,7 @@ from .views import (
     MyTokenObtainPairView,
     RegisterView,
     ProfileView,
+    UpdateProfileView,
     ChangePasswordView,
 
     # Admin User Management
@@ -41,6 +42,8 @@ urlpatterns = [
     # PROFILE
     # -----------------------------------------------------
     path("profile/", ProfileView.as_view(), name="profile"),
+    path("update-profile/", UpdateProfileView.as_view()),
+
     path("change-password/", ChangePasswordView.as_view(), name="change_password"),
 
         # ADMIN USER MANAGEMENT

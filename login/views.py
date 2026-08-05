@@ -78,6 +78,23 @@ class ProfileView(APIView):
         serializer = UserSerializer(user)
         return Response(serializer.data)
 
+class UpdateProfileView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def put(self, request):
+        user = request.user
+        username = request.data.get("username")
+        email = request.data.get("email")
+
+        if username:
+            user.username = username
+        if email:
+            user.email = email
+
+        user.save()
+        return Response({"message": "Profile updated"})
+
+
 
 # ---------------------------------------------------------
 # CHANGE PASSWORD
