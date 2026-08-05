@@ -67,3 +67,14 @@ class Task(models.Model):
 
     def __str__(self):
         return self.title
+
+
+class ActivityLog(models.Model):
+    admin = models.ForeignKey(User, on_delete=models.CASCADE)
+    action = models.CharField(max_length=255)
+    target_user = models.CharField(max_length=255, blank=True, null=True)
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.admin.username} - {self.action}"
+

@@ -9,12 +9,13 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from .models import UserProfile, Note, Task
+from .models import UserProfile, Note, Task, ActivityLog
 from .serializers import (
     UserSerializer,
     MyTokenObtainPairSerializer,
     NoteSerializer,
     TaskSerializer,
+    ActivityLogSerializer,
 )
 
 # ---------------------------------------------------------
@@ -46,8 +47,17 @@ class RegisterView(APIView):
         user = User.objects.create_user(username=username, email=email, password=password)
         UserProfile.objects.create(user=user, role="user")
 
+        ActivityLog.objects.create(
+            admin=request.user,
+            action="Created user",
+            target_user=user.username
+        )
+
+
         return Response({"message": "User registered successfully."},
                         status=status.HTTP_201_CREATED)
+
+    
 
 
 # ---------------------------------------------------------
@@ -155,6 +165,13 @@ class AdminUpdateRoleView(APIView):
         user.profile.role = new_role
         user.profile.save()
 
+        ActivityLog.objects.create(
+            admin=request.user,
+            action=f"Changed role to {new_role}",
+            target_user=user.username
+        )
+
+
         return Response({"message": f"Role updated to {new_role}"})
 
 
@@ -168,39 +185,15 @@ class AdminDeleteUserView(APIView):
             return Response({"error": "User not found"}, status=404)
 
         user.delete()
+
+        ActivityLog.objects.create(
+            admin=request.user,
+            action="Deleted user",
+            target_user=user.username
+        )
+
         return Response({"message": "User deleted successfully"})
 
-
-# ---------------------------------------------------------
-# ADMIN ROLE MANAGEMENT (PROMOTE / DEMOTE)
-# ---------------------------------------------------------
-
-class AdminUpdateRoleView(APIView):
-    permission_classes = [IsAuthenticated, IsAdmin]
-
-    def post(self, request, pk):
-        new_role = request.data.get("role")
-
-        # Validate role
-        if new_role not in dict(UserProfile.ROLE_CHOICES):
-            return Response({"error": "Invalid role"}, status=400)
-
-        try:
-            user = User.objects.get(pk=pk)
-        except User.DoesNotExist:
-            return Response({"error": "User not found"}, status=404)
-
-        # Update role
-        user.profile.role = new_role
-        user.profile.save()
-
-        return Response({
-            "message": f"Role updated to {new_role}",
-            "id": user.id,
-            "username": user.username,
-            "email": user.email,
-            "role": user.profile.role,
-        })
 
 
 # ---------------------------------------------------------
@@ -292,3 +285,11 @@ def task_detail_view(request, pk):
     if request.method == "DELETE":
         task.delete()
         return Response(status=204)
+
+class ActivityLogView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        logs = ActivityLog.objects.all().order_by("-timestamp")
+        serializer = ActivityLogSerializer(logs, many=True)
+        return Response(serializer.data)

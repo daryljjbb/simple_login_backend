@@ -24,6 +24,9 @@ from .views import (
     # Tasks
     tasks_list_create_view,
     task_detail_view,
+
+    # Activity Logs
+    ActivityLogView,
 )
 
 urlpatterns = [
@@ -63,4 +66,7 @@ urlpatterns = [
     # -----------------------------------------------------
     path("tasks/", tasks_list_create_view, name="tasks_list_create"),
     path("tasks/<int:pk>/", task_detail_view, name="task_detail"),
+
+    path("admin/activity/", ActivityLogView.as_view()),
+
 ]
